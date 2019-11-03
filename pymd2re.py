@@ -80,7 +80,7 @@ class Block:
         LIST_CHECK = auto()     # チェックリスト
         PARA = auto()           # 段落
 
-    def __init__(self, kind=Kind.DOCUMENT, parent=None):
+    def __init__(self, kind=Kind.DOCUMENT, parent=None, linenum=0):
         '''
         コンストラクタ
         '''
@@ -91,7 +91,9 @@ class Block:
         # 親コンテンツ
         self.parent = parent
         # レベル
-        self.level = 0     # ヘッダ、リストで使用する
+        self.level = 0     # ヘッダ、引用、リストで使用する
+        # 解析元の行番号
+        self.linenum = linenum
 
     def __str__(self):
         '''
@@ -109,13 +111,13 @@ class MarkdownParser:
     Markdownパーサー
     '''
 
+    # 定数
+    INDENT_WIDTH = 4    # インデント文字幅
+
     def __init__(self):
         '''
         コンストラクタ
         '''
-        # 定数
-        self.INDENT_WIDTH = 4       # インデント文字幅
-
         # ブロックのための正規表現オブジェクト
         # リストに内包可能なものは先頭のインデントを許容（\s*）
         self._regexb = {}
@@ -189,10 +191,12 @@ class MarkdownParser:
         # 全行ループ
         for i, cur_line in enumerate(lines):
             # 直前の処理でループを進めている場合はその位置までスキップ
-            if i <= skip: continue
+            if i <= skip:
+                continue
 
             # 空行はスキップ
-            if len(cur_line) == 0: continue
+            if len(cur_line) == 0:
+                continue
 
             # ブロック解析のための関数リスト
             # ※解析を行う順番に定義
@@ -214,7 +218,8 @@ class MarkdownParser:
             # ブロック解析関数を処理されるまで順に呼び出す
             for func in parse_block_funcs:
                 done, skip = func(doc, lines, i)
-                if done: break
+                if done:
+                    break
 
         return doc
 
@@ -250,7 +255,7 @@ class MarkdownParser:
                         skip = len(lines)
 
             # ブロック作成
-            block = Block(Block.Kind.COMMENT, cur_block)
+            block = Block(Block.Kind.COMMENT, cur_block, i + 1)
             # 情報を格納
             inline = Inline()
             inline.texts.append('\n'.join(sub_lines))
@@ -271,7 +276,7 @@ class MarkdownParser:
         match = self._regexb[Block.Kind.HEADER][0].match(lines[i])
         if match:
             # ブロック作成
-            block = Block(Block.Kind.HEADER, cur_block)
+            block = Block(Block.Kind.HEADER, cur_block, i + 1)
             # 情報を格納
             block.level = match[1].count('#')
             inlines = self._parse_inline(match[2])
@@ -295,7 +300,7 @@ class MarkdownParser:
             match = self._regexb[Block.Kind.HEADER][1].match(sub_line)
             if match:
                 # ブロック作成
-                block = Block(Block.Kind.HEADER, cur_block)
+                block = Block(Block.Kind.HEADER, cur_block, i + 1)
                 # 情報を格納
                 block.level = 1 if '=' in sub_line else 2
                 inlines = self._parse_inline(lines[i])
@@ -317,7 +322,7 @@ class MarkdownParser:
         match = self._regexb[Block.Kind.HR].match(lines[i])
         if match:
             # ブロック作成
-            block = Block(Block.Kind.HR, cur_block)
+            block = Block(Block.Kind.HR, cur_block, i + 1)
             # カレントブロックに登録
             cur_block.subitems.append(block)
             done = True
@@ -334,7 +339,7 @@ class MarkdownParser:
         match = self._regexb[Block.Kind.IMAGE].match(lines[i])
         if match:
             # ブロック作成
-            block = Block(Block.Kind.IMAGE, cur_block)
+            block = Block(Block.Kind.IMAGE, cur_block, i + 1)
             # 情報を格納
             inlines = self._parse_inline(match[0])
             block.subitems.extend(inlines)
@@ -370,7 +375,7 @@ class MarkdownParser:
                 skip = len(lines)
 
             # ブロック作成
-            block = Block(Block.Kind.PRE, cur_block)
+            block = Block(Block.Kind.PRE, cur_block, i + 1)
             # 情報を格納
             inline = Inline()
             inline.texts.append('\n'.join(sub_lines))
@@ -413,7 +418,7 @@ class MarkdownParser:
                     skip = len(lines)
 
             # ブロック作成
-            block = Block(Block.Kind.CODE, cur_block)
+            block = Block(Block.Kind.CODE, cur_block, i + 1)
             # 情報を格納
             inline = Inline()
             inline.texts.append('\n'.join(sub_lines))
@@ -435,7 +440,7 @@ class MarkdownParser:
         if match:
             # 引用ヘッドを作成して登録
             cur_block_backup = cur_block
-            block = Block(Block.Kind.QUOTE_TOP, cur_block)
+            block = Block(Block.Kind.QUOTE_TOP, cur_block, i + 1)
             cur_block.subitems.append(block)
             cur_block = block
 
@@ -467,7 +472,8 @@ class MarkdownParser:
                 # 深さが +1 された場合
                 elif level - cur_level == 1:
                     # ブロック作成
-                    block = Block(Block.Kind.QUOTE_DATA, cur_block)
+                    block = Block(Block.Kind.QUOTE_DATA, cur_block, i + j + 1)
+                    block.level = level
                     # カレントブロックに登録
                     cur_block.subitems.append(block)
                     # カレントブロックを移動
@@ -506,7 +512,7 @@ class MarkdownParser:
         match = self._regexb[Block.Kind.TABLE_ROW][0].match(lines[i])
         if match:
             # ブロック作成
-            block_table_top = Block(Block.Kind.TABLE_TOP, cur_block)
+            block_table_top = Block(Block.Kind.TABLE_TOP, cur_block, i + 1)
 
             # 現在行からループを進める
             for j, sub_line in enumerate(lines[i:]):
@@ -537,11 +543,11 @@ class MarkdownParser:
                     cell_inlines.append(inlines)
 
                 # 表の行ブロックを作成
-                block_row = Block(Block.Kind.TABLE_ROW, block_table_top)
+                block_row = Block(Block.Kind.TABLE_ROW, block_table_top, i + j + 1)
                 # 行内のセルをインライン要素として解析しながら登録
                 for cell in cells:
                     # 表のセルブロックを作成
-                    block_cell = Block(Block.Kind.TABLE_CELL, block_row)
+                    block_cell = Block(Block.Kind.TABLE_CELL, block_row, i + j + 1)
                     inlines = self._parse_inline(cell)
                     block_cell.subitems.extend(inlines)
                     # 行ブロックに連結
@@ -576,8 +582,8 @@ class MarkdownParser:
             3種類のリストのいずれかにマッチするか調べる
             '''
             kind = None
-            d, text = self._check_indent(line)
-            level = d + 1
+            depth, text = self._check_indent(line)
+            level = depth + 1
 
             # 3種類のリストのマッチをチェック
             match_n = self._regexb[Block.Kind.LIST_NORMAL].match(text)
@@ -617,7 +623,8 @@ class MarkdownParser:
             # ブロック解析関数を処理されるまで順に呼び出す
             for func in parse_block_funcs:
                 done, skip = func(cur_block, lines, i)
-                if done: break
+                if done:
+                    break
 
             # リストの直後の段落はリスト文字列の続きと見なす
             # それ以外の段落ブロックは削除
@@ -646,7 +653,7 @@ class MarkdownParser:
         if kind:
             # リストヘッドを作成して登録
             cur_block_backup = cur_block
-            block = Block(Block.Kind.LIST_TOP, cur_block)
+            block = Block(Block.Kind.LIST_TOP, cur_block, i + 1)
             cur_block.subitems.append(block)
             cur_block = block
 
@@ -655,7 +662,8 @@ class MarkdownParser:
 
             # 現在行からループを進める
             for j, sub_line in enumerate(lines[i:]):
-                if j <= skip_j: continue
+                if j <= skip_j:
+                    continue
 
                 # リストにマッチするかチェック
                 kind, level, text = match_some_list(sub_line)
@@ -667,7 +675,8 @@ class MarkdownParser:
                             cur_block = cur_block.parent
 
                         # ブロック作成
-                        block = Block(kind, cur_block.parent)
+                        block = Block(kind, cur_block.parent, i + j + 1)
+                        block.level = level
                         # カレントブロックと同階層に登録
                         cur_block.parent.subitems.append(block)
                         # カレントブロックを移動
@@ -676,7 +685,8 @@ class MarkdownParser:
                     # 深さが同じ場合
                     elif level == cur_level:
                         # ブロック作成
-                        block = Block(kind, cur_block.parent)
+                        block = Block(kind, cur_block.parent, i + j + 1)
+                        block.level = level
                         # カレントブロックと同階層に登録
                         cur_block.parent.subitems.append(block)
                         # カレントブロックを移動
@@ -685,7 +695,8 @@ class MarkdownParser:
                     # 深さが +1 された場合
                     elif level - cur_level == 1:
                         # ブロック作成
-                        block = Block(kind, cur_block)
+                        block = Block(kind, cur_block, i + j + 1)
+                        block.level = level
                         # カレントブロックに登録
                         cur_block.subitems.append(block)
                         # カレントブロックを移動
@@ -705,7 +716,7 @@ class MarkdownParser:
 
                 else:
                     # リストに内包可能なブロックをチェック
-                    done, skip_j = match_inner_list(cur_block, cur_level, lines[i:], j)
+                    done, skip_j = match_inner_list(cur_block, cur_level, lines, i + j)
                     if not done:
                         # ループを進めた位置の直前までスキップさせる
                         skip = i + j - 1
@@ -744,7 +755,7 @@ class MarkdownParser:
                 cur_block.subitems[-1].subitems.extend(inlines)
             else:
                 # 新しい段落のためのブロック作成
-                block = Block(Block.Kind.PARA, cur_block)
+                block = Block(Block.Kind.PARA, cur_block, i + 1)
                 block.subitems.extend(inlines)
                 # カレントブロックに登録
                 cur_block.subitems.append(block)
@@ -753,7 +764,7 @@ class MarkdownParser:
 
         return done, skip
 
-    def _parse_inline(self, line, has_lf = False):
+    def _parse_inline(self, line, has_lf=False):
         '''
         インライン要素を解析
         '''
@@ -828,8 +839,8 @@ class MarkdownParser:
             sp_cnt = match[1].count(' ')
             tab_cnt = match[1].count('\t')
             # スペースの数をチェック
-            if sp_cnt % self.INDENT_WIDTH == 0:
-                depth = sp_cnt // self.INDENT_WIDTH + tab_cnt
+            if sp_cnt % MarkdownParser.INDENT_WIDTH == 0:
+                depth = sp_cnt // MarkdownParser.INDENT_WIDTH + tab_cnt
                 deindent = match[2]
 
         return depth, deindent
@@ -843,7 +854,7 @@ class MarkdownParser:
         # 半角SPまたはタブ文字のインデントを表す正規表現オブジェクト
         regex_indent = re.compile(
             r'^(' +
-            (r' ' * self.INDENT_WIDTH) +
+            (r' ' * MarkdownParser.INDENT_WIDTH) +
             r'|\t)'
         )
 
@@ -859,6 +870,17 @@ class ReviewRenderer:
     Re:VIEWレンダラ
     '''
 
+    # 列挙型
+    class MessageLevel(IntEnum):
+        '''
+        メッセージレベル
+        '''
+        DEBUG = auto()
+        INFO = auto()
+        WARNING = auto()
+        ERROR = auto()
+
+
     def __init__(self):
         '''
         コンストラクタ
@@ -869,34 +891,266 @@ class ReviewRenderer:
         '''
         ()演算子：レンダリング処理
         '''
-        lines = []
 
         # レンダリング
-        self._render(doc)
+        output = self._render_block(doc, '')
 
-        return lines
+        return output
 
-    def _render(self, block, depth=0):
+    def _render_block(self, block, output):
         '''
-        全ブロックを再帰的にレンダリング
+        ブロックを再帰的にレンダリング
         '''
-        lines = []
+        # 出力文字列は明示的に改行コード(\n)を格納すること
+
+        # このブロックのヘッダ文字列
+        block_head = ''
+        # このブロック内の行のヘッダ文字列
+        line_head = ''
+        # このブロック内の行のフッタ文字列
+        line_foot = ''
+        # このブロックの降った文字列
+        block_foot = ''
+
+        # このブロックの出力可否
+        is_output = True
+
+        # コメント
+        if block.kind == Block.Kind.COMMENT:
+            line_head = '#@# '
+
+        # 見出し
+        elif block.kind == Block.Kind.HEADER:
+            level = block.level
+            if level >= 6:
+                level = 5
+                # 警告
+                self._print_error('６段階以上の見出しは使用できません。５段階目として出力します。', MessageLevel.WARNING, linenum)
+
+            line_head = '=' * level + ' '
+
+        # 水平線
+        elif block.kind == Block.Kind.HR:
+            is_output = False
+            # 警告
+            self._print_error('水平線は使用できません。出力対象外とします。', MessageLevel.WARNING, linenum)
+
+        # 画像
+        elif block.kind == Block.Kind.IMAGE:
+            pass
+
+        # 整形済みテキスト
+        elif block.kind == Block.Kind.PRE:
+            block_head = '//emlist{'
+            block_foot = '//}'
+
+        # コード
+        elif block.kind == Block.Kind.CODE:
+            block_head = '//emlist{'
+            block_foot = '//}'
+
+        # 引用(データヘッダ)
+        elif block.kind == Block.Kind.QUOTE_TOP:
+            pass
+
+        # 引用
+        elif block.kind == Block.Kind.QUOTE_DATA:
+            if block.level >= 2:
+                # 警告
+                self._print_error('２段階以上の引用は使用できません。１段階目として出力します。', MessageLevel.WARNING, linenum)
+            block_head = '//quote{'
+            block_foot = '//}'
+
+        # 表(データヘッダ)
+        elif block.kind == Block.Kind.TABLE_TOP:
+            ## TODO
+            block_head = ''
+            line_head = ''
+            line_foot = ''
+            block_foot = ''
+
+        # 表の行
+        elif block.kind == Block.Kind.TABLE_ROW:
+            ## TODO
+            block_head = ''
+            line_head = ''
+            line_foot = ''
+            block_foot = ''
+
+        # 表のセル
+        elif block.kind == Block.Kind.TABLE_CELL:
+            ## TODO
+            block_head = ''
+            line_head = ''
+            line_foot = ''
+            block_foot = ''
+
+        # リスト(データヘッダ)
+        elif block.kind == Block.Kind.LIST_TOP:
+            pass
+
+        # 番号無しリスト
+        elif block.kind == Block.Kind.LIST_NORMAL:
+            line_head = '*' * block.level + ' '
+
+        # 番号付きリスト
+        elif block.kind == Block.Kind.LIST_ORDERED:
+            if block.level >= 2:
+                is_output = False
+                # 警告
+                self._print_error('番号付きリストのネストは使用できません。出力対象外とします。', MessageLevel.WARNING, linenum)
+            else:
+                line_head = '1. '
+
+        # チェックリスト
+        elif block.kind == Block.Kind.LIST_CHECK:
+            line_head = '*' * block.level + ' '
+            # 警告
+            self._print_error('チェックリストは使用できません。番号無しリストとして出力します。', MessageLevel.WARNING, linenum)
+
+        # 段落
+        elif block.kind == Block.Kind.PARA:
+            pass
+
+
+        def convert_text(text, head, foot):
+            '''
+            テキストを出力文字列に変換
+            '''
+            # テキストを行に分割
+            lines = text.split('\n')
+            # 全行にヘッダとフッタを連結
+            lines = [(head + l + foot) for l in lines]
+            # １つのテキストに戻す
+            text = '\n'.join(lines)
+
+            return text
+
+
+        output_buf = ''
+
+        # ブロックヘッダを出力
+        output_buf += block_head
+
+        text = None
+
+        # 内部要素をループ
         for subitem in block.subitems:
-            # デバッグ用プリント
-            if DEBUG_MODE:
-                print('  ' * depth + str(subitem))
-
+            # ブロック
             if isinstance(subitem, Block):
-                # 内部を再帰的にレンダリング
-                self._render(subitem, depth + 1)
+                # ここまでのテキストを出力
+                if text is not None:
+                    output_buf += convert_text(text, line_head, line_foot)
+                    text = None
+
+                # 内部ブロックを再帰的にレンダリング
+                self._render_block(subitem, output_buf)
+
+            # インライン
             elif isinstance(subitem, Inline):
-                # テキスト化
-                pass
+                # インライン要素をレンダリングしてテキストを保持
+                text += self._render_inline(subitem, block.linenum)
 
-        return lines
+        # ここまでのテキストを出力
+        if text is not None:
+            output_buf += convert_text(text, line_head, line_foot)
+            text = None
+
+        # ブロックフッタを出力
+        output_buf += block_foot
+        # ブロック間には空行を挿入
+        output_buf += '\n'
+
+        # 出力文字列を確定
+        if is_output:
+            output += output_buf
+
+        return output
+
+    def _render_inline(self, inline, linenum):
+        '''
+        インライン要素をレンダリング
+        '''
+        output = ''
+
+        # プレーンテキスト
+        if inline.kind == Inline.Kind.PLANE:
+            output = inline.texts[0]
+
+        # コメント
+        elif inline.kind == Inline.Kind.COMMENT:
+            # 警告
+            self._print_error('インラインコメントは使用できません。出力対象外とします。', MessageLevel.WARNING, linenum)
+
+        # イタリック
+        elif inline.kind == Inline.Kind.ITALIC:
+            output = '@<i>{' + inline.texts[0] + '}'
+
+        # ボールド
+        elif inline.kind == Inline.Kind.BOLD:
+            output = '@<b>{' + inline.texts[0] + '}'
+
+        # ボールド＆イタリック
+        elif inline.kind == Inline.Kind.BOLD_ITALIC:
+            output = '@<b>{' + inline.texts[0] + '}'
+            # 警告
+            self._print_error('ボールド＆イタリックは使用できません。ボールドで出力します。', MessageLevel.WARNING, linenum)
+
+        # コード
+        elif inline.kind == Inline.Kind.CODE:
+            output = '@<code>{' + inline.texts[0] + '}'
+
+        # 取消線
+        elif inline.kind == Inline.Kind.STRIKE:
+            output = inline.texts[0]
+            # 警告
+            self._print_error('取消線は使用できません。プレーンテキストで出力します。', MessageLevel.WARNING, linenum)
+
+        # 絵文字
+        elif inline.kind == Inline.Kind.EMOJI:
+            # 警告
+            self._print_error('絵文字は使用できません。出力対象外とします。', MessageLevel.WARNING, linenum)
+
+        # リンク
+        elif inline.kind == Inline.Kind.LINK:
+            if len(inline.texts) >= 2:
+                output = '@<href>{%s,%s}' % (inline.texts[1], inline.texts[0])
+            else:
+                output = '@<href>{%s}' % (inline.texts[0])
+
+        # 画像
+        elif inline.kind == Inline.Kind.IMAGE:
+            if len(inline.texts) >= 2:
+                output += '//image[%s][%s]{' % (inline.texts[0], inline.texts[1])
+            else:
+                output += '//image[%s]{' % (inline.texts[0])
+            output += '//}'
+
+        return output
+
+    def _print_error(self, msg, level, linenum):
+        '''
+        エラーメッセージを表示
+        '''
+        # メッセージレベル
+        ltext = ''
+        if level == MessageLevel.DEBUG:
+            ltext = 'Debug'
+        elif level == MessageLevel.INFO:
+            ltext = 'Info '
+        elif level == MessageLevel.WARNING:
+            ltext = 'Warn '
+        elif level == MessageLevel.ERROR:
+            ltext = 'Error'
+
+        # 表示
+        print('%s: %s (Line=%d)' % (ltext, msg, linenum)
 
 
-if __name__ == '__main__':
+def main():
+    '''
+    メイン
+    '''
     # 引数解析
     parser = argparse.ArgumentParser(description='Convert Markdown file to Re:VIEW file.')
     parser.add_argument('input_path', help='Input File Path. (Markdown file)')
@@ -912,6 +1166,10 @@ if __name__ == '__main__':
     md_parser = MarkdownParser()
     md_doc = md_parser(md_lines)
 
+    # デバッグ用プリント
+    if DEBUG_MODE:
+        block_print(md_doc)
+
     # 文書ブロック -> Re:VIEW
     re_renderer = ReviewRenderer()
     re_lines = re_renderer(md_doc)
@@ -919,3 +1177,20 @@ if __name__ == '__main__':
     # Re:VIEWファイル書き込み
     with open(args.output_path, 'w', encoding='utf-8') as f:
         f.write('\n'.join(re_lines))
+
+
+def block_print(block, depth=0):
+    '''
+    ブロックを再帰的に表示
+    '''
+    for subitem in block.subitems:
+        # ブロック・インライン要素を表示
+        print('  ' * depth + str(subitem))
+
+        if isinstance(subitem, Block):
+            # 内部を再帰的にレンダリング
+            self._render(subitem, depth + 1)
+
+
+if __name__ == '__main__':
+    main()
