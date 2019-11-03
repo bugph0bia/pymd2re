@@ -23,8 +23,8 @@ class Inline:
         '''
         PLANE = auto()          # プレーンテキスト
         COMMENT = auto()        # コメント
-        BOLD = auto()           # ボールド
         ITALIC = auto()         # イタリック
+        BOLD = auto()           # ボールド
         BOLD_ITALIC = auto()    # ボールド＆イタリック
         CODE = auto()           # コード
         STRIKE = auto()         # 取消線
@@ -69,9 +69,13 @@ class Block:
         IMAGE = auto()          # 画像
         PRE = auto()            # 整形済みテキスト
         CODE = auto()           # コード
-        QUOTE = auto()          # 引用
-        TABLE = auto()          # 表
-        LIST = auto()           # リスト
+        QUOTE_TOP = auto()      # 引用(データヘッダ)
+        QUOTE_DATA = auto()     # 引用
+        TABLE_TOP = auto()      # 表(データヘッダ)
+        TABLE_ROW = auto()      # 表の行
+        TABLE_CELL = auto()     # 表のセル
+        LIST_TOP = auto()       # リスト(データヘッダ)
+        LIST_NORMAL = auto()    # 番号無しリスト
         LIST_ORDERED = auto()   # 番号付きリスト
         LIST_CHECK = auto()     # チェックリスト
         PARA = auto()           # 段落
@@ -109,12 +113,15 @@ class MarkdownParser:
         '''
         コンストラクタ
         '''
+        # 定数
+        self.INDENT_WIDTH = 4       # インデント文字幅
+
         # ブロックのための正規表現オブジェクト
         # リストに内包可能なものは先頭のインデントを許容（\s*）
         self._regexb = {}
         self._regexb[Block.Kind.COMMENT] = []                                                   # コメント
-        self._regexb[Block.Kind.COMMENT].append(re.compile(r'^<!-{2,}(.*?)(-{2,}>)?$'))         #   [0] 開始 ※同じ行で終了する場合を考慮
-        self._regexb[Block.Kind.COMMENT].append(re.compile(r'^(.*?)-{2,}>'))                    #   [1] 終了
+        self._regexb[Block.Kind.COMMENT].append(re.compile(r'^\s*<!-{2,}(.*?)(-{2,}>)?$'))      #   [0] 開始 ※同じ行で終了する場合を考慮
+        self._regexb[Block.Kind.COMMENT].append(re.compile(r'^\s*(.*?)-{2,}>'))                 #   [1] 終了
         self._regexb[Block.Kind.HEADER] = []                                                    # 見出し
         self._regexb[Block.Kind.HEADER].append(re.compile(r'^(#+) (.*)'))                       #   [0] 行頭が #
         self._regexb[Block.Kind.HEADER].append(re.compile(r'^(={3,}|-{3,})$'))                  #   [1] 次行が === ---
@@ -122,11 +129,11 @@ class MarkdownParser:
         self._regexb[Block.Kind.IMAGE] = re.compile(r'^\s*!\[(.+?)\]\((.+?)( +"(.+?)")?\)$')    # 画像
         self._regexb[Block.Kind.PRE] = re.compile(r'^ {4}(.*)$')                                # 整形済みテキスト
         self._regexb[Block.Kind.CODE] = re.compile(r'^\s*`{3}(.*)$')                            # コード
-        self._regexb[Block.Kind.QUOTE] = re.compile(r'^\s*(>+)(.*)$')                           # 引用
-        self._regexb[Block.Kind.TABLE] = []                                                     # 表
-        self._regexb[Block.Kind.TABLE].append(re.compile(r'^\s*(\|\s*[^\|]*?\s*)+\|$'))         #   [0] データ行
-        self._regexb[Block.Kind.TABLE].append(re.compile(r'^\s*(\|\s*-+?\s*)+\|$'))             #   [1] 区切り行
-        self._regexb[Block.Kind.LIST] = re.compile(r'^(-|\*) (.*)$')                            # リスト
+        self._regexb[Block.Kind.QUOTE_DATA] = re.compile(r'^\s*(>+)(.*)$')                      # 引用
+        self._regexb[Block.Kind.TABLE_ROW] = []                                                 # 表
+        self._regexb[Block.Kind.TABLE_ROW].append(re.compile(r'^\s*(\|\s*[^\|]*?\s*)+\|$'))     #   [0] データ行
+        self._regexb[Block.Kind.TABLE_ROW].append(re.compile(r'^\s*(\|\s*(:)?-+?(:)?\s*)+\|$')) #   [1] 区切り行
+        self._regexb[Block.Kind.LIST_NORMAL] = re.compile(r'^(-|\*) (.*)$')                     # 番号無しリスト
         self._regexb[Block.Kind.LIST_ORDERED] = re.compile(r'^(\d+\.) (.*)$')                   # 番号付きリスト
         self._regexb[Block.Kind.LIST_CHECK] = re.compile(r'^(-|\*) \[( |x|X)?\] (.*)$')         # チェックリスト
         self._regexb[Block.Kind.PARA] = re.compile(r'^\s*(.+)$')                                # 段落
@@ -134,8 +141,8 @@ class MarkdownParser:
         # インラインのための正規表現
         restr = {}
         restr[Inline.Kind.COMMENT] = r'<!-{2,}([^-]*?)-{2,}>'                       # <!--xxx-->
-        restr[Inline.Kind.BOLD] = r'\*{1}([^\*]+?)\*{1}|_{1}([^_]+?)_{1}'           # *xxx* or _xxx_
-        restr[Inline.Kind.ITALIC] = r'\*{2}([^\*]+?)\*{2}|_{2}([^_]+?)_{1}'         # **xxx** or __xxx__
+        restr[Inline.Kind.ITALIC] = r'\*{1}([^\*]+?)\*{1}|_{1}([^_]+?)_{1}'         # *xxx* or _xxx_
+        restr[Inline.Kind.BOLD] = r'\*{2}([^\*]+?)\*{2}|_{2}([^_]+?)_{2}'           # **xxx** or __xxx__
         restr[Inline.Kind.BOLD_ITALIC] = r'\*{3}([^\*]+?)\*{3}|_{3}([^_]+?)_{3}'    # ***xxx*** or ___xxx___
         restr[Inline.Kind.CODE] = r'`(.+?)`'                                        # `xxx`
         restr[Inline.Kind.STRIKE] = r'~{2}(.+?)~{2}'                                # ~~xxx~~
@@ -147,8 +154,8 @@ class MarkdownParser:
         # インラインのための正規表現中の、保持する可能性のあるテキストを表すグループ番号
         self._regext_gid = {}
         self._regext_gid[Inline.Kind.COMMENT] = (1,)        # コメント
-        self._regext_gid[Inline.Kind.BOLD] = (1, 2)         # ボールド
         self._regext_gid[Inline.Kind.ITALIC] = (1, 2)       # イタリック
+        self._regext_gid[Inline.Kind.BOLD] = (1, 2)         # ボールド
         self._regext_gid[Inline.Kind.BOLD_ITALIC] = (1, 2)  # ボールド＆イタリック
         self._regext_gid[Inline.Kind.CODE] = (1,)           # コード
         self._regext_gid[Inline.Kind.STRIKE] = (1,)         # 取消線
@@ -159,8 +166,8 @@ class MarkdownParser:
         # インラインのための正規表現オブジェクト
         self._regext = {}
         self._regext[Inline.Kind.COMMENT] = re.compile(restr[Inline.Kind.COMMENT])          # コメント
-        self._regext[Inline.Kind.BOLD] = re.compile(restr[Inline.Kind.BOLD])                # ボールド
         self._regext[Inline.Kind.ITALIC] = re.compile(restr[Inline.Kind.ITALIC])            # イタリック
+        self._regext[Inline.Kind.BOLD] = re.compile(restr[Inline.Kind.BOLD])                # ボールド
         self._regext[Inline.Kind.BOLD_ITALIC] = re.compile(restr[Inline.Kind.BOLD_ITALIC])  # ボールド＆イタリック
         self._regext[Inline.Kind.CODE] = re.compile(restr[Inline.Kind.CODE])                # コード
         self._regext[Inline.Kind.STRIKE] = re.compile(restr[Inline.Kind.STRIKE])            # 取消線
@@ -184,52 +191,30 @@ class MarkdownParser:
             # 直前の処理でループを進めている場合はその位置までスキップ
             if i <= skip: continue
 
-            # 空行
+            # 空行はスキップ
             if len(cur_line) == 0: continue
 
-            # コメント
-            done, skip = self._parse_block_comment(doc, lines, i)
-            if done: continue
+            # ブロック解析のための関数リスト
+            # ※解析を行う順番に定義
+            # ※入力/出力が一致している必要あり（ダックタイピング）
+            parse_block_funcs = [
+                self._parse_block_comment,          # コメント
+                self._parse_block_header_single,    # 見出し(行頭が # のケース)
+                self._parse_block_hr,               # 水平線
+                self._parse_block_image,            # 画像
+                self._parse_block_pre,              # 整形済みテキスト
+                self._parse_block_code,             # コード
+                self._parse_block_quote,            # 引用
+                self._parse_block_table,            # 表
+                self._parse_block_list,             # リスト
+                self._parse_block_header_multiple,  # 見出し(次行が === --- のケース)
+                self._parse_block_para,             # 段落
+            ]
 
-            # 見出し(行頭が # のケース)
-            done, skip = self._parse_block_header_single(doc, lines, i)
-            if done: continue
-
-            # 水平線
-            done, skip = self._parse_block_hr(doc, lines, i)
-            if done: continue
-
-            # 画像
-            done, skip = self._parse_block_image(doc, lines, i)
-            if done: continue
-
-            # 整形済みテキスト
-            done, skip = self._parse_block_pre(doc, lines, i)
-            if done: continue
-
-            # コード
-            done, skip = self._parse_block_code(doc, lines, i)
-            if done: continue
-
-            # 引用
-            done, skip = self._parse_block_quote(doc, lines, i)
-            if done: continue
-
-            # 表
-            done, skip = self._parse_block_table(doc, lines, i)
-            if done: continue
-
-            # リスト
-            done, skip = self._parse_block_list(doc, lines, i)
-            if done: continue
-
-            # 見出し(次行が === --- のケース)
-            done, skip = self._parse_block_header_multiple(doc, lines, i)
-            if done: continue
-
-            # 段落
-            done, skip = self._parse_block_para(doc, lines, i)
-            if done: continue
+            # ブロック解析関数を処理されるまで順に呼び出す
+            for func in parse_block_funcs:
+                done, skip = func(doc, lines, i)
+                if done: break
 
         return doc
 
@@ -379,7 +364,7 @@ class MarkdownParser:
                     skip = i + j - 1
                     break
                 # 途中の文字列は退避
-                sub_lines.append(lines[i])
+                sub_lines.append(sub_line)
             else:
                 # 最後までスキップ
                 skip = len(lines)
@@ -387,7 +372,8 @@ class MarkdownParser:
             # ブロック作成
             block = Block(Block.Kind.PRE, cur_block)
             # 情報を格納
-            inline = '\n'.join(sub_lines)
+            inline = Inline()
+            inline.texts.append('\n'.join(sub_lines))
             block.subitems.append(inline)
             # カレントブロックに登録
             cur_block.subitems.append(block)
@@ -406,6 +392,9 @@ class MarkdownParser:
         if match:
             sub_lines = []
 
+            # インデントの深さをチェック
+            indent_depth, _ = self._check_indent(lines[i])
+
             # 次の行からループを進める
             if i < len(lines) - 1:
                 for j, sub_line in enumerate(lines[i+1:]):
@@ -415,8 +404,10 @@ class MarkdownParser:
                         # ループを進めた位置までスキップさせる
                         skip = (i + 1) + j
                         break
+
                     # 途中の文字列はコードとして退避
-                    sub_lines.append(lines[i])
+                    sub_line = self._delete_indent(sub_line, indent_depth)
+                    sub_lines.append(sub_line)
                 else:
                     # 最後までスキップ
                     skip = len(lines)
@@ -424,7 +415,8 @@ class MarkdownParser:
             # ブロック作成
             block = Block(Block.Kind.CODE, cur_block)
             # 情報を格納
-            inline = '\n'.join(sub_lines)
+            inline = Inline()
+            inline.texts.append('\n'.join(sub_lines))
             block.subitems.append(inline)
             # カレントブロックに登録
             cur_block.subitems.append(block)
@@ -439,14 +431,20 @@ class MarkdownParser:
         done = False
         skip = i
 
-        match = self._regexb[Block.Kind.QUOTE].match(lines[i])
+        match = self._regexb[Block.Kind.QUOTE_DATA].match(lines[i])
         if match:
+            # 引用ヘッドを作成して登録
+            cur_block_backup = cur_block
+            block = Block(Block.Kind.QUOTE_TOP, cur_block)
+            cur_block.subitems.append(block)
+            cur_block = block
+
             cur_level = 0
 
             # 現在行からループを進める
             for j, sub_line in enumerate(lines[i:]):
                 # マッチしなくなったらループ終了
-                match = self._regexb[Block.Kind.QUOTE].match(sub_line)
+                match = self._regexb[Block.Kind.QUOTE_DATA].match(sub_line)
                 if not match:
                     # ループを進めた位置の直前までスキップさせる
                     skip = i + j - 1
@@ -469,7 +467,7 @@ class MarkdownParser:
                 # 深さが +1 された場合
                 elif level - cur_level == 1:
                     # ブロック作成
-                    block = Block(Block.Kind.QUOTE, cur_block)
+                    block = Block(Block.Kind.QUOTE_DATA, cur_block)
                     # カレントブロックに登録
                     cur_block.subitems.append(block)
                     # カレントブロックを移動
@@ -484,11 +482,15 @@ class MarkdownParser:
                 cur_level = level
 
                 # ブロックに情報を連結
-                inlines = self._parse_inline(match[2])
+                inlines = self._parse_inline(match[2], has_lf=True)
+
                 cur_block.subitems.extend(inlines)
             else:
                 # 最後までスキップ
                 skip = len(lines)
+
+            # カレントブロックを引用解析前に戻す
+            cur_block = cur_block_backup
 
             done = True
 
@@ -501,16 +503,16 @@ class MarkdownParser:
         done = False
         skip = i
 
-        match = self._regexb[Block.Kind.TABLE][0].match(lines[i])
+        match = self._regexb[Block.Kind.TABLE_ROW][0].match(lines[i])
         if match:
             # ブロック作成
-            block = Block(Block.Kind.TABLE, cur_block)
+            block_table_top = Block(Block.Kind.TABLE_TOP, cur_block)
 
             # 現在行からループを進める
             for j, sub_line in enumerate(lines[i:]):
                 # マッチしなくなったらループ終了
                 idx = 1 if j == 1 else 0
-                match = self._regexb[Block.Kind.TABLE][idx].match(sub_line)
+                match = self._regexb[Block.Kind.TABLE_ROW][idx].match(sub_line)
                 if not match:
                     # ループを進めた位置の直前までスキップさせる
                     skip = i + j - 1
@@ -534,18 +536,30 @@ class MarkdownParser:
                     inlines = self._parse_inline(cell)
                     cell_inlines.append(inlines)
 
-                # ブロックに情報を連結
-                block.subitems.append(cell_inlines)
+                # 表の行ブロックを作成
+                block_row = Block(Block.Kind.TABLE_ROW, block_table_top)
+                # 行内のセルをインライン要素として解析しながら登録
+                for cell in cells:
+                    # 表のセルブロックを作成
+                    block_cell = Block(Block.Kind.TABLE_CELL, block_row)
+                    inlines = self._parse_inline(cell)
+                    block_cell.subitems.extend(inlines)
+                    # 行ブロックに連結
+                    block_row.subitems.append(block_cell)
+
+                # 表ブロックに行ブロックを連結
+                block_table_top.subitems.append(block_row)
+
             else:
                 # 最後までスキップ
                 skip = len(lines)
 
             # 全行の列数をチェック
-            col_counts = [len(r) for r in block.subitems]
+            col_counts = [len(row.subitems) for row in block_table_top.subitems]
             # 列数に不一致がなければ
-            if len([{col_counts}]) == 1:
+            if len(list(set(col_counts))) == 1:
                 # カレントブロックに登録
-                cur_block.subitems.append(block)
+                cur_block.subitems.append(block_table_top)
                 done = True
 
         return done, skip
@@ -557,18 +571,19 @@ class MarkdownParser:
         done = False
         skip = i
 
-        def match_some_list(md_line):
+        def match_some_list(line):
             '''
             3種類のリストのいずれかにマッチするか調べる
             '''
-            match_n = self._regexb[Block.Kind.LIST].match(md_line)
-            match_o = self._regexb[Block.Kind.LIST_ORDERED].match(md_line)
-            match_c = self._regexb[Block.Kind.LIST_CHECK].match(md_line)
-
             kind = None
-            d, _ = self._check_indent(md_line)
+            d, text = self._check_indent(line)
             level = d + 1
-            text = ''
+
+            # 3種類のリストのマッチをチェック
+            match_n = self._regexb[Block.Kind.LIST_NORMAL].match(text)
+            match_o = self._regexb[Block.Kind.LIST_ORDERED].match(text)
+            match_c = self._regexb[Block.Kind.LIST_CHECK].match(text)
+
             if match_c:
                 kind = Block.Kind.LIST_CHECK
                 text = match_c[3]
@@ -576,7 +591,7 @@ class MarkdownParser:
                 kind = Block.Kind.LIST_ORDERED
                 text = match_o[2]
             elif match_n:
-                kind = Block.Kind.LIST
+                kind = Block.Kind.LIST_NORMAL
                 text = match_n[2]
 
             return kind, level, text
@@ -587,47 +602,54 @@ class MarkdownParser:
             '''
             # リスト内のインデントに制限を設けないため cur_level は未使用
 
-            # 画像
-            done, skip = self._parse_block_image(cur_block, lines, i)
+            # ブロック解析のための関数リスト
+            # ※解析を行う順番に定義
+            # ※入力/出力が一致している必要あり（ダックタイピング）
+            parse_block_funcs = [
+                self._parse_block_comment,          # コメント
+                self._parse_block_image,            # 画像
+                self._parse_block_code,             # コード
+                self._parse_block_quote,            # 引用
+                self._parse_block_table,            # 表
+                self._parse_block_para,             # 段落
+            ]
+
+            # ブロック解析関数を処理されるまで順に呼び出す
+            for func in parse_block_funcs:
+                done, skip = func(cur_block, lines, i)
+                if done: break
+
+            # リストの直後の段落はリスト文字列の続きと見なす
+            # それ以外の段落ブロックは削除
+
+            # 上で解析関数が処理済みとなっている場合
             if done:
-                return done, skip
+                # 末尾に登録されたブロックを取り出す
+                block = cur_block.subitems.pop(-1)
 
-            # コード
-            done, skip = self._parse_block_code(cur_block, lines, i)
-            if done:
-                return done, skip
+                # 段落ブロックの場合
+                if block.kind == Block.Kind.PARA:
+                    # さらに前がリスト文字列（インライン要素）の場合
+                    if len(cur_block.subitems) == 0 or \
+                       isinstance(cur_block.subitems[-1], Inline):
+                        # 段落の文字列を連結する
+                        cur_block.subitems.extend(block.subitems)
+                else:
+                    # 段落ブロックでなければ戻す
+                    cur_block.subitems.append(block)
 
-            # 引用
-            done, skip = self._parse_block_quote(cur_block, lines, i)
-            if done:
-                return done, skip
-
-            # 表
-            done, skip = self._parse_block_table(cur_block, lines, i)
-            if done:
-                return done, skip
-
-            # 段落
-            done, skip = self._parse_block_para(cur_block, lines, i)
-            if done:
-                # リストの直後の段落はリスト文字列の続きと見なす
-                # それ以外の段落ブロックは削除
-
-                # 末尾に登録された段落ブロックを取り出す
-                para = cur_block.subitem.pop(-1)
-
-                # さらに前がリスト文字列（インライン要素）
-                if len(cur_block.subitem) == 0 or \
-                   isinstance(cur_block.subitem[-1], Inline):
-                    # 段落の文字列を連結する
-                    cur_block.subitem.extend(para.subitems)
-
-                return done, skip
+            return done, skip
 
         # リストにマッチするかチェック
         kind, level, text = match_some_list(lines[i])
 
         if kind:
+            # リストヘッドを作成して登録
+            cur_block_backup = cur_block
+            block = Block(Block.Kind.LIST_TOP, cur_block)
+            cur_block.subitems.append(block)
+            cur_block = block
+
             cur_level = 0
             skip_j = -1
 
@@ -641,7 +663,7 @@ class MarkdownParser:
                     # 深さが減少した場合
                     if level < cur_level:
                         # カレントブロックを上へ移動
-                        for i in range(cur_level - level):
+                        for _ in range(cur_level - level):
                             cur_block = cur_block.parent
 
                         # ブロック作成
@@ -692,6 +714,9 @@ class MarkdownParser:
                 # 最後までスキップ
                 skip = len(lines)
 
+            # カレントブロックをリスト解析前に戻す
+            cur_block = cur_block_backup
+
             done = True
 
         return done, skip
@@ -709,21 +734,16 @@ class MarkdownParser:
         match = self._regexb[Block.Kind.PARA].match(lines[i])
         if match:
             # インライン要素に変換
-            inlines = self._parse_inline(match[1])
+            inlines = self._parse_inline(match[1], has_lf=True)
 
-            # 最終要素がプレーンテキストの場合は、末尾の改行チェック
-            if inlines[-1].kind == Inline.Kind.PLANE:
-                # 末尾に半角SPが2つある場合は改行コードに変換する
-                if re.search(r' {2}$', inlines[-1].texts[0]):
-                    inlines[-1].texts[0] = inlines[-1].texts[0][:-2] + '\n'
-
-            # 直前のブロックが段落の場合
             block = None
-            if cur_block.subitems and cur_block.subitems[-1].kind == Block.Kind.PARA:
-                # 直前のブロックに連結
+            # 直前のブロックが段落 かつ 直前の行が空行ではない場合
+            if cur_block.subitems and cur_block.subitems[-1].kind == Block.Kind.PARA and \
+               i > 0 and lines[i-1] != '':
+                # 段落の継続と見なし、直前のブロックに連結
                 cur_block.subitems[-1].subitems.extend(inlines)
             else:
-                # ブロック作成
+                # 新しい段落のためのブロック作成
                 block = Block(Block.Kind.PARA, cur_block)
                 block.subitems.extend(inlines)
                 # カレントブロックに登録
@@ -733,12 +753,15 @@ class MarkdownParser:
 
         return done, skip
 
-    def _parse_inline(self, line):
+    def _parse_inline(self, line, has_lf = False):
         '''
         インライン要素を解析
         '''
         inlines = []
         words = []
+
+        # この時点で先頭にスペースがある場合は除去する
+        line = line.lstrip()
 
         # インライン要素のワードに分割
         # 正規表現オブジェクトのsplitではうまくいかない
@@ -781,28 +804,55 @@ class MarkdownParser:
             # インライン要素として登録
             inlines.append(inline)
 
+        # 末尾の改行コードを解析する場合
+        if has_lf and inlines:
+            # 最終要素がプレーンテキストの場合は、末尾の改行チェック
+            if inlines[-1].kind == Inline.Kind.PLANE:
+                # 末尾に半角SPが2つある場合は改行コードに変換する
+                if re.search(r' {2}$', inlines[-1].texts[0]):
+                    inlines[-1].texts[0] = inlines[-1].texts[0][:-2] + '\n'
+
         return inlines
 
     def _check_indent(self, text):
         '''
         文字列のインデントを調べる
         '''
-        INDENT_WIDTH = 4
 
         depth = 0
         deindent = text
 
         # チェック
-        match = re.match(r'^(\s*)(.*)$', text)
+        match = re.match(r'^(\s*)(.*?)$', text)
         if match:
             sp_cnt = match[1].count(' ')
             tab_cnt = match[1].count('\t')
             # スペースの数をチェック
-            if sp_cnt % INDENT_WIDTH:
-                depth = sp_cnt // INDENT_WIDTH + tab_cnt
+            if sp_cnt % self.INDENT_WIDTH == 0:
+                depth = sp_cnt // self.INDENT_WIDTH + tab_cnt
                 deindent = match[2]
 
         return depth, deindent
+
+    def _delete_indent(self, text, depth):
+        '''
+        文字列のインデントを指定した深さ分だけ削除する
+        指定した深さよりインデントが浅い場合は全インデントを削除する
+        '''
+
+        # 半角SPまたはタブ文字のインデントを表す正規表現オブジェクト
+        regex_indent = re.compile(
+            r'^(' +
+            (r' ' * self.INDENT_WIDTH) +
+            r'|\t)'
+        )
+
+        # 指定した深さの回数処理する
+        for _ in range(depth):
+            # 1レベル分のインデントを削除
+            text = regex_indent.sub('', text)
+
+        return text
 
 class ReviewRenderer:
     '''
@@ -855,7 +905,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Markdownファイル読み込み
-    with open(args.input_path, 'r') as f:
+    with open(args.input_path, 'r', encoding='utf-8') as f:
         md_lines = [l.rstrip('\r\n') for l in f.readlines()]    # 改行を除去
 
     # Markdown -> 文書全体ブロック
@@ -867,5 +917,5 @@ if __name__ == '__main__':
     re_lines = re_renderer(md_doc)
 
     # Re:VIEWファイル書き込み
-    with open(args.output_path, 'w') as f:
+    with open(args.output_path, 'w', encoding='utf-8') as f:
         f.write('\n'.join(re_lines))
