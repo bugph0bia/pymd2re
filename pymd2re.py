@@ -9,9 +9,6 @@ from enum import IntEnum, auto
 import re
 
 
-DEBUG_MODE = True
-
-
 class Inline:
     '''
     インラインクラス
@@ -69,12 +66,13 @@ class Block:
         IMAGE = auto()          # 画像
         PRE = auto()            # 整形済みテキスト
         CODE = auto()           # コード
-        QUOTE_TOP = auto()      # 引用(データヘッダ)
+        QUOTE_TOP = auto()      # 引用(データ先頭)
         QUOTE_DATA = auto()     # 引用
-        TABLE_TOP = auto()      # 表(データヘッダ)
+        TABLE_TOP = auto()      # 表(データ先頭)
         TABLE_ROW = auto()      # 表の行
+        TABLE_ROW_H = auto()    # 表のヘッダ行
         TABLE_CELL = auto()     # 表のセル
-        LIST_TOP = auto()       # リスト(データヘッダ)
+        LIST_TOP = auto()       # リスト(データ先頭)
         LIST_NORMAL = auto()    # 番号無しリスト
         LIST_ORDERED = auto()   # 番号付きリスト
         LIST_CHECK = auto()     # チェックリスト
@@ -543,7 +541,8 @@ class MarkdownParser:
                     cell_inlines.append(inlines)
 
                 # 表の行ブロックを作成
-                block_row = Block(Block.Kind.TABLE_ROW, block_table_top, i + j + 1)
+                kind = Block.Kind.TABLE_ROW_H if j == 0 else Block.Kind.TABLE_ROW
+                block_row = Block(kind, block_table_top, i + j + 1)
                 # 行内のセルをインライン要素として解析しながら登録
                 for cell in cells:
                     # 表のセルブロックを作成
@@ -893,15 +892,16 @@ class ReviewRenderer:
         '''
 
         # レンダリング
-        output = self._render_block(doc, '')
+        output = self._render_block(doc)
 
         return output
 
-    def _render_block(self, block, output):
+    def _render_block(self, block):
         '''
         ブロックを再帰的にレンダリング
         '''
         # 出力文字列は明示的に改行コード(\n)を格納すること
+        output = ''
 
         # このブロックのヘッダ文字列
         block_head = ''
@@ -911,13 +911,17 @@ class ReviewRenderer:
         line_foot = ''
         # このブロックの降った文字列
         block_foot = ''
-
         # このブロックの出力可否
         is_output = True
 
+        # 文書全体
+        if block.kind == Block.Kind.DOCUMENT:
+            pass
+
         # コメント
-        if block.kind == Block.Kind.COMMENT:
+        elif block.kind == Block.Kind.COMMENT:
             line_head = '#@# '
+            block_foot = '\n'
 
         # 見出し
         elif block.kind == Block.Kind.HEADER:
@@ -925,93 +929,92 @@ class ReviewRenderer:
             if level >= 6:
                 level = 5
                 # 警告
-                self._print_error('６段階以上の見出しは使用できません。５段階目として出力します。', MessageLevel.WARNING, linenum)
+                self._print_error('６段階以上の見出しは使用できません。５段階目として出力します。', ReviewRenderer.MessageLevel.WARNING, block.linenum)
 
-            line_head = '=' * level + ' '
+            block_head = '=' * level + ' '
+            block_foot = '\n\n'
 
         # 水平線
         elif block.kind == Block.Kind.HR:
             is_output = False
             # 警告
-            self._print_error('水平線は使用できません。出力対象外とします。', MessageLevel.WARNING, linenum)
+            self._print_error('水平線は使用できません。出力対象外とします。', ReviewRenderer.MessageLevel.WARNING, block.linenum)
+            block_foot = '\n\n'
 
         # 画像
         elif block.kind == Block.Kind.IMAGE:
-            pass
+            block_foot = '\n\n'
 
         # 整形済みテキスト
         elif block.kind == Block.Kind.PRE:
-            block_head = '//emlist{'
-            block_foot = '//}'
+            block_head = '//emlist{\n'
+            block_foot = '\n//}\n\n'
 
         # コード
         elif block.kind == Block.Kind.CODE:
-            block_head = '//emlist{'
-            block_foot = '//}'
+            block_head = '//emlist{\n'
+            block_foot = '\n//}\n\n'
 
-        # 引用(データヘッダ)
+        # 引用(データ先頭)
         elif block.kind == Block.Kind.QUOTE_TOP:
-            pass
+            block_foot = '\n'
 
         # 引用
         elif block.kind == Block.Kind.QUOTE_DATA:
             if block.level >= 2:
                 # 警告
-                self._print_error('２段階以上の引用は使用できません。１段階目として出力します。', MessageLevel.WARNING, linenum)
-            block_head = '//quote{'
-            block_foot = '//}'
+                self._print_error('２段階以上の引用は使用できません。１段階目の内容の一部として出力します。', ReviewRenderer.MessageLevel.WARNING, block.linenum)
+            else:
+                block_head = '//quote{\n'
+                block_foot = '//}\n\n'
+            line_foot = '\n'
 
-        # 表(データヘッダ)
+        # 表(データ先頭)
         elif block.kind == Block.Kind.TABLE_TOP:
-            ## TODO
-            block_head = ''
-            line_head = ''
-            line_foot = ''
-            block_foot = ''
+            block_head = '//table[][]{\n'
+            block_foot = '//}\n\n'
 
         # 表の行
         elif block.kind == Block.Kind.TABLE_ROW:
-            ## TODO
-            block_head = ''
-            line_head = ''
-            line_foot = ''
-            block_foot = ''
+            block_foot = '\n'
+
+        # 表のヘッダ行
+        elif block.kind == Block.Kind.TABLE_ROW_H:
+            block_foot = '\n------\n'
 
         # 表のセル
         elif block.kind == Block.Kind.TABLE_CELL:
-            ## TODO
-            block_head = ''
-            line_head = ''
-            line_foot = ''
-            block_foot = ''
+            line_foot = '\t'
 
-        # リスト(データヘッダ)
+        # リスト(データ先頭)
         elif block.kind == Block.Kind.LIST_TOP:
-            pass
+            block_foot = '\n'
 
         # 番号無しリスト
         elif block.kind == Block.Kind.LIST_NORMAL:
-            line_head = '*' * block.level + ' '
+            block_head = '*' * block.level + ' '
+            line_foot = '\n'
 
         # 番号付きリスト
         elif block.kind == Block.Kind.LIST_ORDERED:
             if block.level >= 2:
                 is_output = False
                 # 警告
-                self._print_error('番号付きリストのネストは使用できません。出力対象外とします。', MessageLevel.WARNING, linenum)
+                self._print_error('番号付きリストのネストは使用できません。出力対象外とします。', ReviewRenderer.MessageLevel.WARNING, block.linenum)
             else:
-                line_head = '1. '
+                block_head = '1. '
+            line_foot = '\n'
 
         # チェックリスト
         elif block.kind == Block.Kind.LIST_CHECK:
-            line_head = '*' * block.level + ' '
+            block_head = '*' * block.level + ' '
             # 警告
-            self._print_error('チェックリストは使用できません。番号無しリストとして出力します。', MessageLevel.WARNING, linenum)
+            self._print_error('チェックリストは使用できません。番号無しリストとして出力します。', ReviewRenderer.MessageLevel.WARNING, block.linenum)
+            line_foot = '\n'
 
         # 段落
         elif block.kind == Block.Kind.PARA:
-            pass
-
+            block_foot = '\n\n'
 
         def convert_text(text, head, foot):
             '''
@@ -1026,11 +1029,8 @@ class ReviewRenderer:
 
             return text
 
-
-        output_buf = ''
-
         # ブロックヘッダを出力
-        output_buf += block_head
+        output += block_head
 
         text = None
 
@@ -1040,30 +1040,42 @@ class ReviewRenderer:
             if isinstance(subitem, Block):
                 # ここまでのテキストを出力
                 if text is not None:
-                    output_buf += convert_text(text, line_head, line_foot)
+                    output += convert_text(text, line_head, line_foot)
                     text = None
 
                 # 内部ブロックを再帰的にレンダリング
-                self._render_block(subitem, output_buf)
+                output += self._render_block(subitem)
 
             # インライン
             elif isinstance(subitem, Inline):
                 # インライン要素をレンダリングしてテキストを保持
-                text += self._render_inline(subitem, block.linenum)
+                text_buf = self._render_inline(subitem, block.linenum)
+                if text is not None:
+                    text += text_buf
+                else:
+                    text = text_buf
 
         # ここまでのテキストを出力
         if text is not None:
-            output_buf += convert_text(text, line_head, line_foot)
+            output += convert_text(text, line_head, line_foot)
             text = None
 
+        # 特定のブロック処理
+        if block.kind == Block.Kind.TABLE_ROW or \
+           block.kind == Block.Kind.TABLE_ROW_H:
+            # TABLE_CELL の処理で入れた末尾のタブ文字を削除
+            output = output.rstrip('\t')
+        elif block.kind == Block.Kind.TABLE_CELL:
+            # 空文字列は . とする
+            if not output:
+                output = '.'
+
         # ブロックフッタを出力
-        output_buf += block_foot
-        # ブロック間には空行を挿入
-        output_buf += '\n'
+        output += block_foot
 
         # 出力文字列を確定
-        if is_output:
-            output += output_buf
+        if not is_output:
+            output = ''
 
         return output
 
@@ -1080,7 +1092,7 @@ class ReviewRenderer:
         # コメント
         elif inline.kind == Inline.Kind.COMMENT:
             # 警告
-            self._print_error('インラインコメントは使用できません。出力対象外とします。', MessageLevel.WARNING, linenum)
+            self._print_error('インラインコメントは使用できません。出力対象外とします。', ReviewRenderer.MessageLevel.WARNING, linenum)
 
         # イタリック
         elif inline.kind == Inline.Kind.ITALIC:
@@ -1094,7 +1106,7 @@ class ReviewRenderer:
         elif inline.kind == Inline.Kind.BOLD_ITALIC:
             output = '@<b>{' + inline.texts[0] + '}'
             # 警告
-            self._print_error('ボールド＆イタリックは使用できません。ボールドで出力します。', MessageLevel.WARNING, linenum)
+            self._print_error('ボールド＆イタリックは使用できません。ボールドで出力します。', ReviewRenderer.MessageLevel.WARNING, linenum)
 
         # コード
         elif inline.kind == Inline.Kind.CODE:
@@ -1104,12 +1116,12 @@ class ReviewRenderer:
         elif inline.kind == Inline.Kind.STRIKE:
             output = inline.texts[0]
             # 警告
-            self._print_error('取消線は使用できません。プレーンテキストで出力します。', MessageLevel.WARNING, linenum)
+            self._print_error('取消線は使用できません。プレーンテキストで出力します。', ReviewRenderer.MessageLevel.WARNING, linenum)
 
         # 絵文字
         elif inline.kind == Inline.Kind.EMOJI:
             # 警告
-            self._print_error('絵文字は使用できません。出力対象外とします。', MessageLevel.WARNING, linenum)
+            self._print_error('絵文字は使用できません。出力対象外とします。', ReviewRenderer.MessageLevel.WARNING, linenum)
 
         # リンク
         elif inline.kind == Inline.Kind.LINK:
@@ -1121,9 +1133,9 @@ class ReviewRenderer:
         # 画像
         elif inline.kind == Inline.Kind.IMAGE:
             if len(inline.texts) >= 2:
-                output += '//image[%s][%s]{' % (inline.texts[0], inline.texts[1])
+                output += '//image[%s][%s]{\n' % (inline.texts[0], inline.texts[1])
             else:
-                output += '//image[%s]{' % (inline.texts[0])
+                output += '//image[%s]{\n' % (inline.texts[0])
             output += '//}'
 
         return output
@@ -1134,17 +1146,17 @@ class ReviewRenderer:
         '''
         # メッセージレベル
         ltext = ''
-        if level == MessageLevel.DEBUG:
+        if level == ReviewRenderer.MessageLevel.DEBUG:
             ltext = 'Debug'
-        elif level == MessageLevel.INFO:
+        elif level == ReviewRenderer.MessageLevel.INFO:
             ltext = 'Info '
-        elif level == MessageLevel.WARNING:
+        elif level == ReviewRenderer.MessageLevel.WARNING:
             ltext = 'Warn '
-        elif level == MessageLevel.ERROR:
+        elif level == ReviewRenderer.MessageLevel.ERROR:
             ltext = 'Error'
 
         # 表示
-        print('%s: %s (Line=%d)' % (ltext, msg, linenum)
+        print('{:5}: [Line={:>4}] {}'.format(ltext, linenum, msg))
 
 
 def main():
@@ -1156,6 +1168,7 @@ def main():
     parser.add_argument('input_path', help='Input File Path. (Markdown file)')
     parser.add_argument('output_path', help='Output File Path. (Re:VIEW file)')
     parser.add_argument('-s', '--starter', action='store_true', help='Use Re:VIEW Stareter Extentions.')
+    parser.add_argument('-d', '--debug', action='store_true', help='Enable debug print. (stdout)')
     args = parser.parse_args()
 
     # Markdownファイル読み込み
@@ -1167,7 +1180,7 @@ def main():
     md_doc = md_parser(md_lines)
 
     # デバッグ用プリント
-    if DEBUG_MODE:
+    if args.debug:
         block_print(md_doc)
 
     # 文書ブロック -> Re:VIEW
@@ -1176,7 +1189,7 @@ def main():
 
     # Re:VIEWファイル書き込み
     with open(args.output_path, 'w', encoding='utf-8') as f:
-        f.write('\n'.join(re_lines))
+        f.write(re_lines)
 
 
 def block_print(block, depth=0):
@@ -1189,7 +1202,7 @@ def block_print(block, depth=0):
 
         if isinstance(subitem, Block):
             # 内部を再帰的にレンダリング
-            self._render(subitem, depth + 1)
+            block_print(subitem, depth + 1)
 
 
 if __name__ == '__main__':
