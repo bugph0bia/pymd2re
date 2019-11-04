@@ -1,11 +1,22 @@
-# pymd2re
+pymd2re
+===
+
+![Software Version](http://img.shields.io/badge/Version-v0.1.0-green.svg?style=flat)
+![Python Version](http://img.shields.io/badge/Python-3.6-blue.svg?style=flat)
+[![MIT License](http://img.shields.io/badge/license-MIT-blue.svg?style=flat)](LICENSE)
 
 ## 概要
 MarkdownファイルをRe:VIEWファイルに変換するスクリプト
 
+## バージョン
+v0.1.0
+
 ## 動作環境
 - Python 3.6以上
 - 標準ライブラリ以外の依存ライブラリは無し
+
+## ライセンス
+MIT License
 
 ## 制限事項
 - 同一行に複数種類のブロックが存在するケースは不可
