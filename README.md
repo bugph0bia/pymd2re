@@ -18,6 +18,22 @@ v0.1.0
 ## ライセンス
 MIT License
 
+## 使用方法
+`pymd2re.py` を実行する。
+
+    usage: pymd2re.py [-h] [-s] [-d] input_path output_path
+    
+    Convert Markdown file to Re:VIEW file.
+    
+    positional arguments:
+      input_path     Input File Path. (Markdown file)
+      output_path    Output File Path. (Re:VIEW file)
+    
+    optional arguments:
+      -h, --help     show this help message and exit
+      -s, --starter  Use Re:VIEW Stareter Extentions.
+      -d, --debug    Enable debug print. (stdout)
+
 ## 制限事項
 - 同一行に複数種類のブロックが存在するケースは不可
     - 行の途中から複数行コメントが始まるなど
