@@ -21,7 +21,7 @@ MIT License
 ## 使用方法
 `pymd2re.py` を実行する。
 
-    usage: pymd2re.py [-h] [-s] [-d] input_path output_path
+    usage: pymd2re.py [-h] input_path output_path
     
     Convert Markdown file to Re:VIEW file.
     
@@ -31,14 +31,22 @@ MIT License
     
     optional arguments:
       -h, --help     show this help message and exit
-      -s, --starter  Use Re:VIEW Stareter Extentions.
-      -d, --debug    Enable debug print. (stdout)
+
+## サンプル
+- `pymd2re.py` による出力結果
+    - 入力ファイル：[sample_input.md](sample/sample_input.md)
+    - 出力ファイル：[sample_output.re](sample/sample_output.re)
+    - 変換時の警告：[warning_stdout.txt](sample/warning_stdout.txt)
+- `debug.py` による中間データの可視化
+    - 入力ファイル：[sample_input.md](sample/sample_input.md)
+    - 出力内容：[debug_stdout.txt](sample/debug_stdout.txt)
 
 ## 制限事項
 - 同一行に複数種類のブロックが存在するケースは不可
     - 行の途中から複数行コメントが始まるなど
     - 同一行に複数種類のインライン要素は許可
 - 以下には未対応（順次対応したい）。
+    - インライン要素のネスト（リンクの中でボールドなど）
     - コードブロックの言語名の取得（無視して処理を継続）
     - 外部参照リンク（あらかじめリンクを定義して複数回記述する書き方のこと）
     - 文書内の見出しへのリンク（書いた通りに出力されてしまう）
@@ -49,3 +57,6 @@ MIT License
 ## メモ
 - 構文解析は正規表現の力技で実装した。
 - 文書構造を中間表現で保持する方式のため、レンダラを用意すればRe:VIEW以外のフォーマットへの出力も可能になるはず。
+
+## TODO
+- Re:VIEW Starter 拡張を使用するオプションに対応する。

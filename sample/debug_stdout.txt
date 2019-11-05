@@ -1,0 +1,203 @@
+[B:HEADER] lv=1
+  [I:PLANE] ("Sampleファイル")
+[B:HEADER] lv=2
+  [I:PLANE] ("標準的な記法")
+[B:HEADER] lv=1
+  [I:PLANE] ("見出し1")
+[B:HEADER] lv=2
+  [I:PLANE] ("見出し2")
+[B:HEADER] lv=1
+  [I:PLANE] ("見出し1")
+[B:HEADER] lv=2
+  [I:PLANE] ("見出し2")
+[B:HEADER] lv=3
+  [I:PLANE] ("見出し3")
+[B:HEADER] lv=4
+  [I:PLANE] ("見出し4")
+[B:HEADER] lv=5
+  [I:PLANE] ("見出し5")
+[B:HEADER] lv=6
+  [I:PLANE] ("見出し6")
+[B:HEADER] lv=3
+  [I:PLANE] ("標準テキスト")
+[B:PARA]
+  [I:PLANE] ("標準テキスト。\n")
+  [I:PLANE] ("改行する場合は末尾に半角SPを２つ入れる。\n")
+[B:PARA]
+  [I:PLANE] ("段落を分ける場合は空行を入れる。\n")
+[B:HEADER] lv=3
+  [I:PLANE] ("文字装飾")
+[B:LIST_TOP]
+  [B:LIST_NORMAL] lv=1
+    [I:ITALIC] ("italic")
+    [I:PLANE] (" または ")
+    [I:ITALIC] ("italic")
+    [I:PLANE] (" で斜体となる。")
+  [B:LIST_NORMAL] lv=1
+    [I:BOLD] ("bold")
+    [I:PLANE] (" または ")
+    [I:BOLD] ("bold")
+    [I:PLANE] (" で太字となる。")
+  [B:LIST_NORMAL] lv=1
+    [I:BOLD_ITALIC] ("italic&bold")
+    [I:PLANE] (" または ")
+    [I:BOLD_ITALIC] ("italic&bold")
+    [I:PLANE] (" で斜体かつ太字となる。")
+  [B:LIST_NORMAL] lv=1
+    [I:CODE] ("inlineCode")
+    [I:PLANE] (" でコード記法（インライン）となる。")
+[B:HEADER] lv=3
+  [I:PLANE] ("整形済みテキスト")
+[B:PRE]
+  [I:PLANE] ("    整形済みテキスト。\n    \n    先頭に半角SP４つ、\n      もしくはタブ文字を入れると、\n        整形済みテキストとなる。\n    直前を空行にする必要あり。")
+[B:HEADER] lv=3
+  [I:PLANE] ("コード記法")
+[B:CODE]
+  [I:PLANE] ("# コードを書く場合\ndef test():\n    return 1 + 2\n\nprint(test())")
+[B:HEADER] lv=3
+  [I:PLANE] ("リスト")
+[B:LIST_TOP]
+  [B:LIST_NORMAL] lv=1
+    [I:PLANE] ("リスト")
+    [B:LIST_NORMAL] lv=2
+      [I:PLANE] ("リスト")
+      [B:LIST_NORMAL] lv=3
+        [I:PLANE] ("リスト")
+      [B:LIST_NORMAL] lv=3
+        [I:PLANE] ("リスト")
+    [B:LIST_NORMAL] lv=2
+      [I:PLANE] ("アスタリスクでもリストになる")
+[B:LIST_TOP]
+  [B:LIST_ORDERED] lv=1
+    [I:PLANE] ("番号付きリスト")
+    [B:LIST_ORDERED] lv=2
+      [I:PLANE] ("番号付きリスト")
+      [B:LIST_ORDERED] lv=3
+        [I:PLANE] ("番号付きリスト")
+      [B:LIST_ORDERED] lv=3
+        [I:PLANE] ("番号付きリスト")
+    [B:LIST_ORDERED] lv=2
+      [I:PLANE] ("番号付きリスト")
+  [B:LIST_ORDERED] lv=1
+    [I:PLANE] ("番号付きリスト")
+  [B:LIST_ORDERED] lv=1
+    [I:PLANE] ("番号は自動採番される")
+[B:HEADER] lv=3
+  [I:PLANE] ("引用文")
+[B:QUOTE_TOP]
+  [B:QUOTE_DATA] lv=1
+    [I:PLANE] ("引用文")
+    [I:PLANE] ("標準テキストと同様に改行は半角SP２つ、 ")
+    [I:PLANE] ("段落分けは空行。")
+    [B:QUOTE_DATA] lv=2
+      [I:PLANE] ("二重引用文 ")
+      [I:PLANE] ("二重引用文")
+      [B:QUOTE_DATA] lv=3
+        [I:PLANE] ("三重引用文 ")
+        [I:PLANE] ("三重引用文")
+[B:HEADER] lv=3
+  [I:PLANE] ("水平線")
+[B:HR]
+[B:HR]
+[B:HR]
+[B:HEADER] lv=3
+  [I:PLANE] ("リンク")
+[B:PARA]
+  [I:PLANE] ("リンクを埋め込む場合は ")
+  [I:LINK] ("googleへ移動") ("https://www.google.co.jp/")
+  [I:PLANE] (" のように書く。\n")
+  [I:PLANE] ("予めURLの参照名を定義しておくと、\n")
+  [I:LINK] ("googleへ移動") ("https://www.google.co.jp/")
+  [I:PLANE] ("\n")
+  [I:LINK] ("googleへ移動") ("https://www.google.co.jp/")
+  [I:PLANE] ("\n")
+  [I:PLANE] ("のように定義を使い回すことが可能。（外部参照リンク）\n")
+  [I:LINK] ("https://www.google.co.jp/")
+  [I:PLANE] (" のように、URLを直接書いた場合は自動リンクとなる。\n")
+[B:HEADER] lv=3
+  [I:PLANE] ("イメージ挿入")
+[B:IMAGE]
+  [I:IMAGE] ("イメージ挿入") ("http://placehold.it/100")
+[B:IMAGE]
+  [I:IMAGE] ("イメージ挿入(tips付き)") ("http://placehold.it/100") ("画像の説明文")
+[B:HEADER] lv=3
+  [I:PLANE] ("テーブル")
+[B:TABLE_TOP]
+  [B:TABLE_ROW_H]
+    [B:TABLE_CELL]
+      [I:PLANE] ("ヘッダ")
+    [B:TABLE_CELL]
+      [I:PLANE] ("ヘッダ")
+    [B:TABLE_CELL]
+      [I:PLANE] ("ヘッダ")
+  [B:TABLE_ROW]
+    [B:TABLE_CELL]
+      [I:PLANE] ("左寄せ")
+    [B:TABLE_CELL]
+      [I:PLANE] ("中央寄せ")
+    [B:TABLE_CELL]
+      [I:PLANE] ("右寄せ")
+  [B:TABLE_ROW]
+    [B:TABLE_CELL]
+      [I:PLANE] ("a")
+    [B:TABLE_CELL]
+      [I:PLANE] ("b")
+    [B:TABLE_CELL]
+      [I:PLANE] ("c")
+  [B:TABLE_ROW]
+    [B:TABLE_CELL]
+      [I:PLANE] ("a")
+    [B:TABLE_CELL]
+      [I:PLANE] ("b")
+    [B:TABLE_CELL]
+      [I:PLANE] ("c")
+[B:HEADER] lv=2
+  [I:PLANE] ("処理系依存の機能")
+[B:HEADER] lv=3
+  [I:PLANE] ("コメント")
+[B:PARA]
+  [I:PLANE] ("↓↓↓ここにコメントがある↓↓↓")
+[B:COMMENT]
+  [I:PLANE] (" コメント ")
+[B:COMMENT]
+  [I:PLANE] ("\nコメント\n")
+[B:PARA]
+  [I:PLANE] ("↑↑↑ここにコメントがある↑↑↑")
+[B:HEADER] lv=3
+  [I:PLANE] ("チェックリスト")
+[B:LIST_TOP]
+  [B:LIST_CHECK] lv=1
+    [I:PLANE] ("チェックリスト")
+  [B:LIST_CHECK] lv=1
+    [I:PLANE] ("チェックリスト")
+[B:HEADER] lv=3
+  [I:PLANE] ("文字装飾")
+[B:LIST_TOP]
+  [B:LIST_NORMAL] lv=1
+    [I:STRIKE] ("取り消し線")
+    [I:PLANE] (" で取り消し線となる。")
+  [B:LIST_NORMAL] lv=1
+    [I:PLANE] ("++under line++ で下線となる。")
+[B:HEADER] lv=3
+  [I:PLANE] ("定義リスト")
+[B:PARA]
+  [I:PLANE] ("定義用語１")
+  [I:PLANE] (": 定義用語１の説明文。")
+[B:PARA]
+  [I:PLANE] ("定義用語２")
+  [I:PLANE] (": 定義用語２の説明文。")
+[B:HEADER] lv=3
+  [I:PLANE] ("絵文字")
+[B:PARA]
+  [I:EMOJI] ("+1")
+  [I:PLANE] (" ")
+  [I:LINK] ("絵文字チートシート") ("https://www.webfx.com/tools/emoji-cheat-sheet/")
+[B:HEADER] lv=3
+  [I:PLANE] ("数式(KaTeX)")
+[B:PARA]
+  [I:PLANE] ("インラインで数式を書く場合は、 $x=\frac{-b\pm \sqrt{b^{2}-4ac}}{2a}$ のように書く。")
+[B:PARA]
+  [I:PLANE] ("ブロックで書く場合：")
+  [I:PLANE] ("$$")
+  [I:PLANE] ("x=\frac{-b\pm \sqrt{b^{2}-4ac}}{2a}")
+  [I:PLANE] ("$$")
