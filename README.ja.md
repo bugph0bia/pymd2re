@@ -5,6 +5,8 @@ pymd2re
 ![Python Version](http://img.shields.io/badge/Python-3.6-blue.svg?style=flat)
 [![MIT License](http://img.shields.io/badge/license-MIT-blue.svg?style=flat)](LICENSE)
 
+[English Page](./README.md)
+
 ## 概要
 MarkdownファイルをRe:VIEWファイルに変換するスクリプト
 
